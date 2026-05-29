@@ -1,0 +1,83 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T-6C SY103-SY214 Quiz</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--text:#17202a;--muted:#617080;--line:#d8dee6;--accent:#0b5cab;--soft:#e7f1fb;--ok:#0f7b4f;--okbg:#eaf7f0;--bad:#a43a30;--badbg:#fff0ee;--warn:#8a5a00;--warnbg:#fff7dc}
+*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}header{background:#102033;color:#fff;padding:24px}main{max-width:1180px;margin:auto;padding:18px}h1{margin:0;font-size:28px}.topline{color:#c6d4e5;margin:6px 0 0}.toolbar,.summary,.courses,.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.toolbar,.summary{margin-bottom:14px}.courses{margin-bottom:16px}.pill,.summary span{border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:7px 9px;font-size:13px}.search{flex:1 1 280px;min-width:220px;border:1px solid var(--line);border-radius:6px;padding:10px 12px;font:inherit}.course-filter,.submit,.reset{border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);cursor:pointer;font:inherit;font-weight:700;padding:8px 10px}.course-filter.active{border-color:var(--accent);background:var(--accent);color:#fff}.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:14px;padding:16px}.meta{display:flex;gap:6px;flex-wrap:wrap}.pill{background:var(--soft);color:var(--accent);border:0;font-weight:700}.question{font-size:18px;font-weight:700;margin:12px 0}.choices{display:grid;gap:8px;margin:10px 0}.choice{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:start;border:1px solid var(--line);border-radius:6px;background:#fff;padding:10px;text-align:left;font:inherit;cursor:pointer}.choice.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--soft)}.choice.correct{border-color:var(--ok);background:var(--okbg)}.choice.wrong{border-color:var(--bad);background:var(--badbg)}.choice .idx{color:var(--muted)}.answer{border-top:1px solid var(--line);margin-top:10px;padding-top:10px;font-weight:700}.answer .ok{color:var(--ok)}.feedback{margin-top:8px;font-weight:700}.feedback.ok{color:var(--ok)}.feedback.bad{color:var(--bad)}.warn{background:var(--warnbg);color:var(--warn);border-radius:6px;padding:8px;margin-top:8px}.empty{padding:30px;text-align:center;color:var(--muted)}.loader{padding:30px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>T-6C SY103-SY214 Quiz</h1>
+  <p class="topline">Progress Check / Review Question extractor. Answers stay hidden until Submit.</p>
+</header>
+<main>
+  <div class="toolbar">
+    <input id="search" class="search" type="search" placeholder="Search question, answer, slide id">
+    <button id="resetFilters" class="reset" type="button">Reset</button>
+  </div>
+  <div id="summary" class="summary"></div>
+  <div id="courses" class="courses"></div>
+  <div id="quiz"><div class="loader">Loading quiz data...</div></div>
+</main>
+<script>
+const chunkFiles=["data/quiz-data-01.html","data/quiz-data-02.html","data/quiz-data-03.html","data/quiz-data-04.html","data/quiz-data-05.html","data/quiz-data-06.html","data/quiz-data-07.html","data/quiz-data-08.html","data/quiz-data-09.html"];
+let questions=[],activeCourse='ALL';
+const quiz=document.getElementById('quiz'),coursesEl=document.getElementById('courses'),summary=document.getElementById('summary'),search=document.getElementById('search');
+const norm=v=>String(v||'').trim().toLowerCase();
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function loadFrame(path){return new Promise((resolve,reject)=>{const f=document.createElement('iframe');f.hidden=true;f.onload=()=>{try{resolve((f.contentDocument.body.textContent||'').trim());f.remove();}catch(e){reject(e)}};f.onerror=reject;f.src=path;document.body.appendChild(f);});}
+async function loadQuestions(){
+  const b64=(await Promise.all(chunkFiles.map(loadFrame))).join('');
+  const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+  const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return JSON.parse(await new Response(stream).text());
+}
+function renderFilters(){
+  const list=['ALL',...new Set(questions.map(q=>q.Course))];
+  coursesEl.innerHTML=list.map(c=><button class="course-filter " type="button" data-course=""></button>).join('');
+  coursesEl.querySelectorAll('button').forEach(b=>b.onclick=()=>{activeCourse=b.dataset.course;render();});
+}
+function filtered(){
+  const term=norm(search.value);
+  return questions.filter(q=>{
+    if(activeCourse!=='ALL'&&q.Course!==activeCourse)return false;
+    if(!term)return true;
+    return norm([q.Course,q.Number,q.SlideId,q.DisplayText,q.Question,...(q.Choices||[]),...(q.Answers||[])].join(' ')).includes(term);
+  });
+}
+function card(q,i){
+  const choices=(q.Choices||[]).map((c,idx)=><button class="choice" type="button" data-choice=""><span class="idx">.</span><span></span></button>).join('');
+  const answer=(q.Answers&&q.Answers.length)?q.Answers.join('; '):'No extracted answer text';
+  const warn=q.Warning?<div class="warn"></div>:'';
+  return <article class="card" data-answer="">
+    <div class="meta"><span class="pill"></span><span class="pill">Q</span><span class="pill"></span><span class="pill">Slide </span></div>
+    <div class="question"></div>
+    <div class="choices"></div>
+    <div class="actions"><button class="submit" type="button">Submit answer</button><button class="reset" type="button">Try again</button></div>
+    <div class="feedback" hidden></div><div class="answer" hidden>Answer: <span class="ok"></span></div>
+  </article>;
+}
+function render(){
+  const items=filtered();
+  summary.innerHTML=<span>Total: </span><span>Showing: </span><span>Courses: </span>;
+  quiz.innerHTML=items.length?items.map(card).join(''):'<div class="empty">No questions match this filter.</div>';
+  quiz.querySelectorAll('.card').forEach(wireCard);
+  renderFilters();
+}
+function wireCard(card){
+  let picked='';
+  const ans=norm(card.dataset.answer).replace(/\s+/g,' ');
+  const fb=card.querySelector('.feedback'),answer=card.querySelector('.answer');
+  card.querySelectorAll('.choice').forEach(btn=>btn.onclick=()=>{card.querySelectorAll('.choice').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');picked=btn.dataset.choice;fb.hidden=true;answer.hidden=true;});
+  card.querySelector('.submit').onclick=()=>{answer.hidden=false;fb.hidden=false;const buttons=[...card.querySelectorAll('.choice')];buttons.forEach(b=>{const ok=ans.includes(norm(b.dataset.choice).replace(/\s+/g,' '));b.classList.toggle('correct',ok);b.classList.toggle('wrong',picked===b.dataset.choice&&!ok);});if(!buttons.length){fb.textContent='Review the answer below.';fb.className='feedback ok';return;}if(!picked){fb.textContent='Select an answer first.';fb.className='feedback bad';return;}const good=ans.includes(norm(picked).replace(/\s+/g,' '));fb.textContent=good?'Correct':'Not quite';fb.className='feedback '+(good?'ok':'bad');};
+  card.querySelector('.reset').onclick=()=>{picked='';fb.hidden=true;answer.hidden=true;card.querySelectorAll('.choice').forEach(b=>b.classList.remove('selected','correct','wrong'));};
+}
+search.oninput=render;document.getElementById('resetFilters').onclick=()=>{activeCourse='ALL';search.value='';render();};
+loadQuestions().then(data=>{questions=data;render();}).catch(err=>{quiz.innerHTML='<div class="empty">Could not load quiz data: '+escapeHtml(err.message)+'</div>';});
+</script>
+</body>
+</html>
