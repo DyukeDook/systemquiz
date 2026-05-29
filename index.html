@@ -34,7 +34,7 @@ function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;',
 function loadQuestions(){return JSON.parse(document.getElementById('quiz-data').textContent);}
 function renderFilters(){
   const list=['ALL',...new Set(questions.map(q=>q.Course))];
-  coursesEl.innerHTML=list.map(c=><button class="course-filter " type="button" data-course=""></button>).join('');
+  coursesEl.innerHTML=list.map(c=>`<button class="course-filter ${c===activeCourse?'active':''}" type="button" data-course="${c}">${c}</button>`).join('');
   coursesEl.querySelectorAll('button').forEach(b=>b.onclick=()=>{activeCourse=b.dataset.course;render();});
 }
 function filtered(){
@@ -46,20 +46,20 @@ function filtered(){
   });
 }
 function card(q,i){
-  const choices=(q.Choices||[]).map((c,idx)=><button class="choice" type="button" data-choice=""><span class="idx">.</span><span></span></button>).join('');
+  const choices=(q.Choices||[]).map((c,idx)=>`<button class="choice" type="button" data-choice="${escapeHtml(c)}"><span class="idx">${idx+1}.</span><span>${escapeHtml(c)}</span></button>`).join('');
   const answer=(q.Answers&&q.Answers.length)?q.Answers.join('; '):'No extracted answer text';
-  const warn=q.Warning?<div class="warn"></div>:'';
-  return <article class="card" data-answer="">
-    <div class="meta"><span class="pill"></span><span class="pill">Q</span><span class="pill"></span><span class="pill">Slide </span></div>
-    <div class="question"></div>
-    <div class="choices"></div>
+  const warn=q.Warning?`<div class="warn">${escapeHtml(q.Warning)}</div>`:'';
+  return `<article class="card" data-answer="${escapeHtml(answer)}">
+    <div class="meta"><span class="pill">${escapeHtml(q.Course)}</span><span class="pill">Q${q.Number}</span><span class="pill">${escapeHtml(q.DisplayText)}</span><span class="pill">Slide ${escapeHtml(q.SlideId)}</span></div>
+    <div class="question">${escapeHtml(q.Question)}</div>
+    <div class="choices">${choices||'<div class="pill">Open response</div>'}</div>
     <div class="actions"><button class="submit" type="button">Submit answer</button><button class="reset" type="button">Try again</button></div>
-    <div class="feedback" hidden></div><div class="answer" hidden>Answer: <span class="ok"></span></div>
-  </article>;
+    <div class="feedback" hidden></div><div class="answer" hidden>Answer: <span class="ok">${escapeHtml(answer)}</span></div>${warn}
+  </article>`;
 }
 function render(){
   const items=filtered();
-  summary.innerHTML=<span>Total: </span><span>Showing: </span><span>Courses: </span>;
+  summary.innerHTML=`<span>Total: ${questions.length}</span><span>Showing: ${items.length}</span><span>Courses: ${new Set(questions.map(q=>q.Course)).size}</span>`;
   quiz.innerHTML=items.length?items.map(card).join(''):'<div class="empty">No questions match this filter.</div>';
   quiz.querySelectorAll('.card').forEach(wireCard);
   renderFilters();
